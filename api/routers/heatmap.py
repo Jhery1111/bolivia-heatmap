@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from ..auth import CurrentUser, get_current_user
-from ..database import get_sync_db
+from ..database import get_db, get_sync_db
 
 logger = structlog.get_logger(__name__)
 
@@ -257,11 +257,9 @@ async def get_incidentes_radio(
     horas_atras: int = Query(
         default=24, ge=1, le=168, description="Ventana temporal (1–168 h)."
     ),
-    conn=Depends(__import__("api.database", fromlist=["get_db"]).get_db),
+    conn=Depends(get_db),
 ) -> list:
     """Return incidents within a geographic radius using PostGIS fn_incidentes_en_radio."""
-    from ..database import get_db as _get_db  # local re-import for clarity
-
     log = logger.bind(
         user=current_user.username,
         lon=lon,
