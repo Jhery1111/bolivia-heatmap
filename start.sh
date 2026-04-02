@@ -3,7 +3,7 @@
 #  SIGMAC — Script de arranque rápido
 #  Uso: bash start.sh
 # ─────────────────────────────────────────────────────────────────────────────
-set -euo pipefail
+set -eu
 
 BOLD="\033[1m"
 CYAN="\033[36m"
