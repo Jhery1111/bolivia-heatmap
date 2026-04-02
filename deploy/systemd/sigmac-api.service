@@ -1,0 +1,71 @@
+[Unit]
+Description=SIGMAC API — FastAPI/Uvicorn
+Documentation=https://github.com/dntt-bolivia/sigmac
+After=network.target network-online.target postgresql.service redis.service
+Requires=postgresql.service redis.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=sigmac
+Group=sigmac
+WorkingDirectory=/opt/sigmac
+EnvironmentFile=/opt/sigmac/.env
+
+ExecStart=/opt/sigmac/venv/bin/uvicorn api.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 4 \
+    --loop uvloop \
+    --http httptools \
+    --access-log \
+    --log-level info \
+    --timeout-keep-alive 75 \
+    --timeout-graceful-shutdown 30
+
+ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sigmac-api
+
+# ── Hardening ─────────────────────────────────────────────────────────────────
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@debug @mount @reboot @swap @privileged @resources @cpu-emulation @obsolete
+
+# Rutas permitidas de escritura
+ReadWritePaths=/opt/sigmac /tmp /var/log/sigmac
+
+# Capabilities
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Limits de recursos
+LimitNOFILE=65536
+LimitNPROC=512
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

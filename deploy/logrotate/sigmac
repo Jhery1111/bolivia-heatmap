@@ -1,0 +1,64 @@
+# =============================================================================
+# /etc/logrotate.d/sigmac
+# Rotación de logs para los servicios SIGMAC
+# (API, ETL, Queue Processor)
+# =============================================================================
+
+/var/log/sigmac/*.log {
+    # Rotar diariamente
+    daily
+
+    # Conservar 14 días de histórico
+    rotate 14
+
+    # Comprimir los logs rotados
+    compress
+
+    # No comprimir el log más reciente (el del día anterior)
+    # para facilitar diagnóstico inmediato
+    delaycompress
+
+    # No fallar si el archivo no existe
+    missingok
+
+    # No rotar si el archivo está vacío
+    notifempty
+
+    # Crear el nuevo archivo de log vacío tras la rotación
+    create 640 sigmac sigmac
+
+    # Ejecutar los scripts pre/post una sola vez para todos los archivos del bloque
+    sharedscripts
+
+    # Después de rotar, enviar SIGHUP a los servicios para que reabran sus ficheros de log.
+    # Los servicios SIGMAC usan journald (StandardOutput=journal), por lo que
+    # este bloque es para logs escritos directamente a archivos (si se configura
+    # FileHandler en la aplicación Python).
+    postrotate
+        # Reabrir descriptores de archivo en los servicios
+        systemctl kill -s HUP sigmac-api.service 2>/dev/null || true
+        systemctl kill -s HUP sigmac-etl.service 2>/dev/null || true
+        systemctl kill -s HUP sigmac-queue.service 2>/dev/null || true
+    endscript
+}
+
+# Logs de acceso y error de Nginx para SIGMAC
+/var/log/nginx/sigmac_access.log
+/var/log/nginx/sigmac_error.log
+{
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 640 www-data adm
+    sharedscripts
+
+    postrotate
+        # Nginx recarga los descriptores con USR1
+        if [ -f /var/run/nginx.pid ]; then
+            kill -USR1 "$(cat /var/run/nginx.pid)" 2>/dev/null || true
+        fi
+    endscript
+}

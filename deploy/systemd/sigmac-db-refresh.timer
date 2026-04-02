@@ -1,0 +1,17 @@
+[Unit]
+Description=SIGMAC — Timer para refresco de vistas materializadas cada 5 minutos
+Documentation=https://github.com/dntt-bolivia/sigmac
+After=postgresql.service
+
+[Timer]
+# Esperar 2 minutos tras el arranque antes del primer disparo
+OnBootSec=2min
+# Disparar cada 5 minutos desde la última ejecución del servicio
+OnUnitActiveSec=5min
+# Si el sistema estuvo apagado, ejecutar al reiniciar (no acumular disparos perdidos)
+Persistent=true
+# Nombre explícito de la unidad a activar
+Unit=sigmac-db-refresh.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,42 @@
+[Unit]
+Description=SIGMAC — Refresh Materialized Views
+Documentation=https://github.com/dntt-bolivia/sigmac
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=sigmac
+Group=sigmac
+WorkingDirectory=/opt/sigmac
+EnvironmentFile=/opt/sigmac/.env
+
+ExecStart=/usr/bin/psql ${DATABASE_URL} \
+    -v ON_ERROR_STOP=1 \
+    -c "SELECT sigmac.refresh_all_materialized_views();"
+
+# Si falla no queremos que bloquee al timer
+RemainAfterExit=no
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sigmac-db-refresh
+
+# ── Hardening ─────────────────────────────────────────────────────────────────
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+ReadWritePaths=/tmp
+CapabilityBoundingSet=
+AmbientCapabilities=
