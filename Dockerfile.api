@@ -1,0 +1,26 @@
+FROM python:3.11-slim
+
+# Dependencias del sistema para psycopg2 y geoespaciales
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev gcc g++ libgeos-dev libproj-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Instalar dependencias Python de todos los módulos
+COPY api/requirements.txt /tmp/api-req.txt
+COPY etl/requirements.txt /tmp/etl-req.txt
+COPY analytics/requirements.txt /tmp/analytics-req.txt
+
+RUN pip install --no-cache-dir \
+    -r /tmp/api-req.txt \
+    -r /tmp/etl-req.txt \
+    -r /tmp/analytics-req.txt
+
+# Copiar código fuente
+COPY api/ ./api/
+COPY etl/ ./etl/
+COPY analytics/ ./analytics/
+
+# Comando por defecto: API
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
