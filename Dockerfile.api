@@ -1,26 +1,54 @@
+# ── Stage 1: Builder ─────────────────────────────────────────────────────────
+# Compilar wheels de paquetes pesados (psycopg2, geos, numba, etc.)
+FROM python:3.11-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev gcc g++ \
+    libgeos-dev libproj-dev libgdal-dev \
+    llvm-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copiar requirements de los 3 módulos Python
+COPY api/requirements.txt        /build/api-req.txt
+COPY etl/requirements.txt        /build/etl-req.txt
+COPY analytics/requirements.txt  /build/analytics-req.txt
+
+# Instalar en un directorio dedicado para copiar al runtime
+RUN pip install --no-cache-dir --prefix=/install \
+    -r /build/api-req.txt \
+    -r /build/etl-req.txt \
+    -r /build/analytics-req.txt
+
+# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM python:3.11-slim
 
-# Dependencias del sistema para psycopg2 y geoespaciales
+# Solo librerías runtime (sin compiladores)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc g++ libgeos-dev libproj-dev \
+    libpq5 libgeos3.11.1 libproj25 \
     && rm -rf /var/lib/apt/lists/*
+
+# Copiar paquetes compilados del builder
+COPY --from=builder /install /usr/local
 
 WORKDIR /app
 
-# Instalar dependencias Python de todos los módulos
-COPY api/requirements.txt /tmp/api-req.txt
-COPY etl/requirements.txt /tmp/etl-req.txt
-COPY analytics/requirements.txt /tmp/analytics-req.txt
-
-RUN pip install --no-cache-dir \
-    -r /tmp/api-req.txt \
-    -r /tmp/etl-req.txt \
-    -r /tmp/analytics-req.txt
-
 # Copiar código fuente
-COPY api/ ./api/
-COPY etl/ ./etl/
+COPY api/       ./api/
+COPY etl/       ./etl/
 COPY analytics/ ./analytics/
 
-# Comando por defecto: API
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Usuario no-root
+RUN useradd --no-create-home --shell /sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+
+# CMD por defecto: API. El ETL y Queue usan `command:` en compose.
+CMD ["uvicorn", "api.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "2", \
+     "--loop", "uvloop"]

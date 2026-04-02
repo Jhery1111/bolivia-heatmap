@@ -1,88 +1,164 @@
 version: "3.9"
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  SIGMAC — Sistema de Inteligencia Geoespacial y Mapas de Calor
+#  DNTT Bolivia
+#
+#  Uso:
+#    docker compose up --build          # primera vez
+#    docker compose up -d               # siguiente arranque (background)
+#    docker compose down                # detener
+#    docker compose down -v             # detener + borrar datos DB
+#
+#  Acceso:
+#    Dashboard  → http://localhost
+#    API Docs   → http://localhost/docs
+#    Health     → http://localhost/health
+#
+#  Login:  admin / sigmac2024
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
 
+  # ── PostgreSQL 16 + PostGIS 3 ──────────────────────────────────────────────
   postgres:
     image: postgis/postgis:16-3.4
     container_name: sigmac-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: sigmac_db
-      POSTGRES_USER: sigmac_user
+      POSTGRES_DB:       sigmac_db
+      POSTGRES_USER:     sigmac_user
       POSTGRES_PASSWORD: sigmac_local_pass
-    ports:
-      - "5432:5432"
     volumes:
       - sigmac-pgdata:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d   # corre los SQL al inicio
+      # Los scripts SQL se ejecutan en orden alfabético al inicializar la BD
+      - ./db:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"      # expuesto solo para administración local (DBeaver, etc.)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sigmac_user -d sigmac_db"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 15
+      start_period: 10s
+    networks:
+      - sigmac-net
 
+  # ── Redis ──────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: sigmac-redis
-    ports:
-      - "6379:6379"
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --bind 0.0.0.0
+      --protected-mode no
+    volumes:
+      - sigmac-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - sigmac-net
 
+  # ── API FastAPI ────────────────────────────────────────────────────────────
   api:
     build:
       context: .
       dockerfile: Dockerfile.api
+    image: sigmac-api:latest
     container_name: sigmac-api
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
+    env_file: .env.docker
     environment:
       DATABASE_URL: postgresql://sigmac_user:sigmac_local_pass@postgres:5432/sigmac_db
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: local-dev-secret-change-in-production
-      ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 480
-      ALLOWED_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
-      LOG_LEVEL: INFO
+      REDIS_URL:    redis://redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
-    volumes:
-      - ./analytics:/app/analytics
-      - ./etl:/app/etl
-      - ./api:/app/api
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - sigmac-net
 
+  # ── ETL Sync Job ───────────────────────────────────────────────────────────
   etl:
     build:
       context: .
       dockerfile: Dockerfile.api
+    image: sigmac-api:latest
     container_name: sigmac-etl
+    restart: unless-stopped
     command: python -m etl.sync_job
+    env_file: .env.docker
     environment:
-      DATABASE_URL: postgresql://sigmac_user:sigmac_local_pass@postgres:5432/sigmac_db
-      REDIS_URL: redis://redis:6379/0
-      SYNC_INTERVAL_SECONDS: 30
-      LOG_LEVEL: INFO
+      DATABASE_URL:           postgresql://sigmac_user:sigmac_local_pass@postgres:5432/sigmac_db
+      REDIS_URL:              redis://redis:6379/0
+      SYNC_INTERVAL_SECONDS:  "30"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
-    volumes:
-      - ./analytics:/app/analytics
-      - ./etl:/app/etl
+        condition: service_healthy
+    networks:
+      - sigmac-net
 
-  frontend:
-    image: node:20-alpine
-    container_name: sigmac-frontend
-    working_dir: /app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
+  # ── Queue Processor ────────────────────────────────────────────────────────
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: sigmac-api:latest
+    container_name: sigmac-queue
+    restart: unless-stopped
+    command: python -m etl.queue_processor
+    env_file: .env.docker
     environment:
-      VITE_API_BASE: ""
+      DATABASE_URL: postgresql://sigmac_user:sigmac_local_pass@postgres:5432/sigmac_db
+      REDIS_URL:    redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sigmac-net
 
+  # ── Frontend (build estático + Nginx proxy) ────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: sigmac-frontend:latest
+    container_name: sigmac-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"          # ÚNICO puerto expuesto al host
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - sigmac-net
+
+# ── Volúmenes persistentes ─────────────────────────────────────────────────────
 volumes:
   sigmac-pgdata:
+    name: sigmac-pgdata
+  sigmac-redisdata:
+    name: sigmac-redisdata
+
+# ── Red interna ────────────────────────────────────────────────────────────────
+networks:
+  sigmac-net:
+    name: sigmac-net
+    driver: bridge

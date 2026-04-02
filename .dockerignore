@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Python caches
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/*.egg-info
+**/venv
+**/.venv
+**/.env
+
+# Node
+frontend/node_modules
+frontend/.vite
+
+# Deploy scripts (no van en la imagen)
+deploy/
+
+# Docs
+*.md
+!frontend/index.html
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
