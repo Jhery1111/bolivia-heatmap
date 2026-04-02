@@ -14,10 +14,13 @@ COPY api/requirements.txt        /build/api-req.txt
 COPY etl/requirements.txt        /build/etl-req.txt
 COPY analytics/requirements.txt  /build/analytics-req.txt
 
-# Instalar todas las dependencias en /install
-RUN pip install --no-cache-dir --prefix=/install \
-    -r /build/api-req.txt \
-    -r /build/etl-req.txt \
+# Instalar dependencias en etapas para mejor resiliencia ante timeouts
+# --timeout 300: 5 minutos por paquete (numba/scipy son grandes)
+RUN pip install --no-cache-dir --timeout 300 --prefix=/install \
+    -r /build/api-req.txt
+RUN pip install --no-cache-dir --timeout 300 --prefix=/install \
+    -r /build/etl-req.txt
+RUN pip install --no-cache-dir --timeout 300 --prefix=/install \
     -r /build/analytics-req.txt
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
