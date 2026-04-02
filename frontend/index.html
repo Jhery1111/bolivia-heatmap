@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIGMAC — DNTT Bolivia</title>
+
+  <!-- MapLibre GL JS via CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-logo">
+        <span class="logo-icon">◈</span>
+        <span class="logo-text">SIGMAC</span>
+      </div>
+      <p class="modal-subtitle">Sistema de Inteligencia Geoespacial — DNTT Bolivia</p>
+      <form id="login-form">
+        <div class="form-group">
+          <label for="username">Usuario</label>
+          <input type="text" id="username" name="username" placeholder="admin" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label for="password">Contraseña</label>
+          <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <div id="login-error" class="form-error hidden"></div>
+        <button type="submit" class="btn-primary" id="login-btn">INICIAR SESIÓN</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <span class="logo-icon">◈</span>
+        <span class="logo-text">SIGMAC</span>
+      </div>
+      <div class="sidebar-subtitle">DNTT — Bolivia</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-label">Incidentes (24h)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-criticos">—</div>
+          <div class="stat-label">Críticos</div>
+        </div>
+      </div>
+      <div class="alert-banner alert-0" id="alert-banner">
+        <span class="alert-dot"></span>
+        <span id="alert-text">Cargando...</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">HOTSPOT PRINCIPAL</div>
+      <div id="hotspot-info" class="hotspot-card">—</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">ACTIVIDAD RECIENTE</div>
+      <div id="incident-list" class="incident-list"></div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div id="ws-status" class="ws-status ws-disconnected">
+        <span class="ws-dot"></span> DESCONECTADO
+      </div>
+      <div id="last-update" class="last-update">—</div>
+    </div>
+  </aside>
+
+  <!-- Map Container -->
+  <div id="map"></div>
+
+  <!-- Controls Bar -->
+  <div id="controls">
+    <div class="controls-group">
+      <div class="control-label">TIEMPO: <span id="time-label">Últimas 24h</span></div>
+      <input type="range" id="time-slider" min="1" max="24" value="24" step="1" />
+    </div>
+    <div class="controls-group">
+      <div class="control-label">FILTROS</div>
+      <div class="filter-buttons">
+        <button class="filter-btn active" data-filter="all">Todos</button>
+        <button class="filter-btn" data-filter="severidad-alta">Alta Severidad</button>
+        <button class="filter-btn" data-tipo="ROBO">Robo</button>
+        <button class="filter-btn" data-tipo="ACCIDENTE">Accidente</button>
+        <button class="filter-btn" data-tipo="DISTURBIO">Disturbio</button>
+        <button class="filter-btn" data-tipo="EMERGENCIA">Emergencia</button>
+      </div>
+    </div>
+    <div class="controls-group">
+      <div class="control-label">CAPAS</div>
+      <div class="layer-toggles">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-heatmap" checked />
+          <span>Calor</span>
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-incidents" checked />
+          <span>Puntos</span>
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-pulse" checked />
+          <span>Tiempo real</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Incident Popup -->
+  <div id="incident-popup" class="incident-popup hidden">
+    <button class="popup-close" id="popup-close">✕</button>
+    <div class="popup-header">
+      <span id="popup-tipo" class="popup-tipo"></span>
+      <span id="popup-severidad" class="popup-severidad"></span>
+    </div>
+    <div class="popup-body">
+      <div class="popup-row"><span class="popup-key">Sistema origen:</span><span id="popup-sistema"></span></div>
+      <div class="popup-row"><span class="popup-key">Fecha/Hora:</span><span id="popup-timestamp"></span></div>
+      <div class="popup-row"><span class="popup-key">Coordenadas:</span><span id="popup-coords"></span></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "sigmac-dashboard",
+  "version": "1.0.0",
+  "description": "SIGMAC — Sistema de Inteligencia Geoespacial y Mapas de Calor, DNTT Bolivia",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "maplibre-gl": "^4.7.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
+}
